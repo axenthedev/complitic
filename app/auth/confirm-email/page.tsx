@@ -60,7 +60,7 @@ export default function ConfirmEmailPage() {
               <CardTitle className="text-2xl font-bold text-slate-800">Check your email</CardTitle>
               <CardDescription className="text-slate-600">
                 We've sent a verification link to your email address. Click the link to activate your account and start
-                your free trial.
+                for free.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -77,30 +77,7 @@ export default function ConfirmEmailPage() {
                 </div>
               </div>
 
-              {/* Instructions */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-medium text-slate-800">What happens next?</h3>
-                <div className="space-y-3">
-                  <div className="flex items-start space-x-3">
-                    <div className="w-6 h-6 bg-slate-100 rounded-full flex items-center justify-center text-xs font-medium text-slate-600">
-                      1
-                    </div>
-                    <p className="text-sm text-slate-600">Check your email for a verification link</p>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <div className="w-6 h-6 bg-slate-100 rounded-full flex items-center justify-center text-xs font-medium text-slate-600">
-                      2
-                    </div>
-                    <p className="text-sm text-slate-600">Click the link to verify your account</p>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <div className="w-6 h-6 bg-slate-100 rounded-full flex items-center justify-center text-xs font-medium text-slate-600">
-                      3
-                    </div>
-                    <p className="text-sm text-slate-600">Start generating compliant policies for your store</p>
-                  </div>
-                </div>
-              </div>
+              
 
               {/* Resend email */}
               <div className="space-y-4">
@@ -131,23 +108,7 @@ export default function ConfirmEmailPage() {
                 </div>
               </div>
 
-              {/* Help */}
-              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-                <h4 className="text-sm font-medium text-slate-800 mb-2">Need help?</h4>
-                <p className="text-sm text-slate-600 mb-3">
-                  If you're having trouble receiving the email, try these steps:
-                </p>
-                <ul className="text-sm text-slate-600 space-y-1">
-                  <li>• Check your spam or junk folder</li>
-                  <li>• Make sure you entered the correct email address</li>
-                  <li>• Add noreply@complitic.com to your contacts</li>
-                </ul>
-                <div className="mt-3">
-                  <Link href="#" className="text-sm text-green-600 hover:text-green-500">
-                    Contact support →
-                  </Link>
-                </div>
-              </div>
+              
             </CardContent>
           </Card>
 

@@ -15,7 +15,7 @@ const plans = [
   },
   {
     name: "Pro",
-    price: "$29",
+    price: "$15",
     period: "per month",
     description: "Most popular for growing stores",
     features: [
@@ -32,7 +32,7 @@ const plans = [
   },
   {
     name: "Business",
-    price: "$79",
+    price: "$49",
     period: "per month",
     description: "For established businesses",
     features: [

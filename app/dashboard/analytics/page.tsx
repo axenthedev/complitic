@@ -1,3 +1,8 @@
+"use client"
+
+import { useEffect, useState } from "react";
+import { useAuth, useUser } from "@clerk/nextjs";
+import supabase from "@/lib/supabase/browser";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
@@ -5,6 +10,108 @@ import { BarChart3, TrendingUp, Users, Globe, Calendar, ArrowUpRight } from "luc
 import { TrafficChart } from "@/components/dashboard/traffic-chart"
 
 export default function AnalyticsPage() {
+  const { getToken, isLoaded } = useAuth();
+  const { user: clerkUser, isLoaded: isClerkLoaded } = useUser();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [metrics, setMetrics] = useState<any>(null);
+  const [trafficData, setTrafficData] = useState<any[]>([]);
+  const [geoData, setGeoData] = useState<any[]>([]);
+  const [topPages, setTopPages] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+      setError(null);
+      try {
+        if (!isLoaded || !isClerkLoaded || !clerkUser?.id) return;
+        const token = await getToken({ template: "supabase" });
+        if (token) {
+          await supabase.auth.setSession({ access_token: token, refresh_token: "" });
+        }
+        // Fetch latest metrics (most recent date)
+        const { data: analyticsRows, error: analyticsError } = await supabase
+          .from("analytics")
+          .select("*")
+          .eq("user_id", clerkUser.id)
+          .order("date", { ascending: false })
+          .limit(7);
+        if (analyticsError) throw analyticsError;
+        // Use the most recent row for key metrics
+        const latest = analyticsRows && analyticsRows[0] ? analyticsRows[0] : null;
+        setMetrics(latest);
+        // Prepare traffic data for chart (last 7 days)
+        const traffic = (analyticsRows || []).slice(0, 7).reverse().map(row => ({
+          day: row.date,
+          visitors: row.unique_visitors,
+          pageViews: row.page_views,
+        }));
+        setTrafficData(traffic);
+        // Fetch geo distribution (last 7 days)
+        const since = new Date();
+        since.setDate(since.getDate() - 7);
+        const { data: geoRows, error: geoError } = await supabase
+          .from("analytics_events")
+          .select("country")
+          .eq("user_id", clerkUser.id)
+          .gte("occurred_at", since.toISOString());
+        if (geoError) throw geoError;
+        // Aggregate by country
+        const countryCounts: Record<string, number> = {};
+        (geoRows || []).forEach((row: any) => {
+          if (!row.country) return;
+          countryCounts[row.country] = (countryCounts[row.country] || 0) + 1;
+        });
+        const total = Object.values(countryCounts).reduce((a, b) => a + b, 0);
+        const geo = Object.entries(countryCounts)
+          .map(([country, count]) => ({ country, percent: total ? (count / total) * 100 : 0 }))
+          .sort((a, b) => b.percent - a.percent)
+          .slice(0, 5);
+        setGeoData(geo);
+        // Fetch top pages (last 7 days)
+        const { data: pageRows, error: pageError } = await supabase
+          .from("analytics_events")
+          .select("page_path")
+          .eq("user_id", clerkUser.id)
+          .gte("occurred_at", since.toISOString());
+        if (pageError) throw pageError;
+        // Aggregate by page_path
+        const pageCounts: Record<string, number> = {};
+        (pageRows || []).forEach((row: any) => {
+          if (!row.page_path) return;
+          pageCounts[row.page_path] = (pageCounts[row.page_path] || 0) + 1;
+        });
+        const top = Object.entries(pageCounts)
+          .map(([page, count]) => ({ page, count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 5);
+        setTopPages(top);
+      } catch (err: any) {
+        setError(err.message || "An error occurred");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, [getToken, isLoaded, isClerkLoaded, clerkUser?.id]);
+
+  if (loading || !isClerkLoaded || !clerkUser?.id) {
+    return <div className="p-8 text-center text-slate-500">Loading analytics...</div>;
+  }
+  if (error) {
+    return <div className="p-8 text-center text-red-500">{error}</div>;
+  }
+
+  // Fallbacks for empty data
+  const pageViews = metrics?.page_views ?? 0;
+  const uniqueVisitors = metrics?.unique_visitors ?? 0;
+  const bounceRate = metrics?.bounce_rate ?? 0;
+  const avgSession = metrics?.avg_session ?? "-";
+  const newUsers = metrics?.new_users ?? 0;
+  const returningUsers = metrics?.returning_users ?? 0;
+  const sessionDuration = metrics?.session_duration ?? "-";
+  const pagesPerSession = metrics?.pages_per_session ?? 0;
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -20,11 +127,8 @@ export default function AnalyticsPage() {
             <CardTitle className="text-sm font-medium text-slate-600">Page Views</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900">45,231</div>
-            <div className="flex items-center text-xs text-green-600 mt-1">
-              <ArrowUpRight className="h-3 w-3 mr-1" />
-              +12% from last month
-            </div>
+            <div className="text-2xl font-bold text-slate-900">{pageViews}</div>
+            {/* You can add growth metrics if you calculate them */}
           </CardContent>
         </Card>
 
@@ -33,11 +137,7 @@ export default function AnalyticsPage() {
             <CardTitle className="text-sm font-medium text-slate-600">Unique Visitors</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900">12,847</div>
-            <div className="flex items-center text-xs text-green-600 mt-1">
-              <ArrowUpRight className="h-3 w-3 mr-1" />
-              +8% from last month
-            </div>
+            <div className="text-2xl font-bold text-slate-900">{uniqueVisitors}</div>
           </CardContent>
         </Card>
 
@@ -46,11 +146,7 @@ export default function AnalyticsPage() {
             <CardTitle className="text-sm font-medium text-slate-600">Bounce Rate</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900">24.5%</div>
-            <div className="flex items-center text-xs text-green-600 mt-1">
-              <ArrowUpRight className="h-3 w-3 mr-1" />
-              -3% from last month
-            </div>
+            <div className="text-2xl font-bold text-slate-900">{bounceRate}%</div>
           </CardContent>
         </Card>
 
@@ -59,11 +155,7 @@ export default function AnalyticsPage() {
             <CardTitle className="text-sm font-medium text-slate-600">Avg. Session</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900">3m 24s</div>
-            <div className="flex items-center text-xs text-green-600 mt-1">
-              <ArrowUpRight className="h-3 w-3 mr-1" />
-              +15% from last month
-            </div>
+            <div className="text-2xl font-bold text-slate-900">{avgSession}</div>
           </CardContent>
         </Card>
       </div>
@@ -79,7 +171,7 @@ export default function AnalyticsPage() {
             <CardDescription>Website traffic for the last 7 days</CardDescription>
           </CardHeader>
           <CardContent>
-            <TrafficChart />
+            <TrafficChart data={trafficData} />
           </CardContent>
         </Card>
 
@@ -92,45 +184,16 @@ export default function AnalyticsPage() {
             <CardDescription>Visitor locations by country</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-3">
+            {geoData.length === 0 && <div className="text-slate-500 text-sm">No data</div>}
+            {geoData.map((g, i) => (
+              <div key={g.country} className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">United States</span>
-                <span className="text-sm text-slate-600">45.2%</span>
+                  <span className="text-sm font-medium">{g.country}</span>
+                  <span className="text-sm text-slate-600">{g.percent.toFixed(1)}%</span>
               </div>
-              <Progress value={45.2} className="h-2" />
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">United Kingdom</span>
-                <span className="text-sm text-slate-600">23.8%</span>
+                <Progress value={g.percent} className="h-2" />
               </div>
-              <Progress value={23.8} className="h-2" />
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Germany</span>
-                <span className="text-sm text-slate-600">15.4%</span>
-              </div>
-              <Progress value={15.4} className="h-2" />
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Canada</span>
-                <span className="text-sm text-slate-600">8.9%</span>
-              </div>
-              <Progress value={8.9} className="h-2" />
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Others</span>
-                <span className="text-sm text-slate-600">6.7%</span>
-              </div>
-              <Progress value={6.7} className="h-2" />
-            </div>
+            ))}
           </CardContent>
         </Card>
       </div>
@@ -147,19 +210,19 @@ export default function AnalyticsPage() {
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-sm">New Users</span>
-              <Badge className="bg-green-100 text-green-800">68%</Badge>
+              <Badge className="bg-green-100 text-green-800">{newUsers}%</Badge>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm">Returning Users</span>
-              <Badge className="bg-blue-100 text-blue-800">32%</Badge>
+              <Badge className="bg-blue-100 text-blue-800">{returningUsers}%</Badge>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm">Session Duration</span>
-              <span className="text-sm font-medium">3m 24s</span>
+              <span className="text-sm font-medium">{sessionDuration}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm">Pages per Session</span>
-              <span className="text-sm font-medium">2.4</span>
+              <span className="text-sm font-medium">{pagesPerSession}</span>
             </div>
           </CardContent>
         </Card>
@@ -172,60 +235,18 @@ export default function AnalyticsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm">/dashboard</span>
-              <span className="text-sm text-slate-600">12,847</span>
+            {topPages.length === 0 && <div className="text-slate-500 text-sm">No data</div>}
+            {topPages.map((p, i) => (
+              <div key={p.page} className="flex items-center justify-between">
+                <span className="text-sm">{p.page}</span>
+                <span className="text-sm text-slate-600">{p.count}</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm">/policy-generator</span>
-              <span className="text-sm text-slate-600">8,234</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm">/cookie-manager</span>
-              <span className="text-sm text-slate-600">5,678</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm">/compliance-scanner</span>
-              <span className="text-sm text-slate-600">4,123</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm">/settings</span>
-              <span className="text-sm text-slate-600">2,456</span>
-            </div>
+            ))}
           </CardContent>
         </Card>
 
-        <Card className="bg-white rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group hover-border-animation">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Calendar className="h-5 w-5 text-red-600" />
-              <span>Recent Activity</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="text-sm">
-              <span className="font-medium">Policy generated</span>
-              <div className="text-xs text-slate-600">2 hours ago</div>
-            </div>
-            <div className="text-sm">
-              <span className="font-medium">Cookie banner updated</span>
-              <div className="text-xs text-slate-600">5 hours ago</div>
-            </div>
-            <div className="text-sm">
-              <span className="font-medium">Compliance scan completed</span>
-              <div className="text-xs text-slate-600">1 day ago</div>
-            </div>
-            <div className="text-sm">
-              <span className="font-medium">New user registered</span>
-              <div className="text-xs text-slate-600">2 days ago</div>
-            </div>
-            <div className="text-sm">
-              <span className="font-medium">Store connected</span>
-              <div className="text-xs text-slate-600">3 days ago</div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* You can add more analytics cards here */}
       </div>
     </div>
-  )
+  );
 }

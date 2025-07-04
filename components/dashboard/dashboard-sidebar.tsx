@@ -66,6 +66,7 @@ const navigationGroups = [
     items: [
       { title: "Account Settings", href: "/dashboard/settings", icon: Settings },
       { title: "Billing & Plan", href: "/dashboard/billing", icon: CreditCard },
+      { title: "API / Tracking Script", href: "/dashboard/api", icon: FileText },
     ],
   },
 ]

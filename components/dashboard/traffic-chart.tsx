@@ -3,7 +3,7 @@
 import { Line, LineChart, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 
-const trafficData = [
+const defaultTrafficData = [
   { day: "Mon", visitors: 1200, pageViews: 2400 },
   { day: "Tue", visitors: 1900, pageViews: 3200 },
   { day: "Wed", visitors: 1600, pageViews: 2800 },
@@ -13,7 +13,8 @@ const trafficData = [
   { day: "Sun", visitors: 1800, pageViews: 3000 },
 ]
 
-export function TrafficChart() {
+export function TrafficChart({ data }: { data?: any[] }) {
+  const trafficData = data && data.length > 0 ? data : defaultTrafficData;
   return (
     <ChartContainer
       config={{

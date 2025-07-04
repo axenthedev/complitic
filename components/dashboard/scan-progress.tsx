@@ -57,52 +57,51 @@ export function ScanProgress({ isScanning, onComplete }: ScanProgressProps) {
       progress: 0,
     },
   ])
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
 
   useEffect(() => {
     if (!isScanning) {
       setOverallProgress(0)
       setSteps(steps.map((step) => ({ ...step, status: "pending", progress: 0 })))
+      setCurrentStepIndex(0)
       return
     }
 
-    let currentStepIndex = 0
-    const interval = setInterval(() => {
-      if (currentStepIndex >= steps.length) {
+    let interval: NodeJS.Timeout;
+    interval = setInterval(() => {
+      setSteps((prevSteps) => {
+        const newSteps = [...prevSteps]
+        if (currentStepIndex >= newSteps.length) {
         clearInterval(interval)
         setOverallProgress(100)
         setTimeout(() => {
           onComplete()
         }, 1000)
-        return
+          return newSteps
       }
-
-      setSteps((prevSteps) => {
-        const newSteps = [...prevSteps]
-
         // Update current step
-        if (newSteps[currentStepIndex].progress < 100) {
+        if (newSteps[currentStepIndex] && newSteps[currentStepIndex].progress < 100) {
           newSteps[currentStepIndex].status = "scanning"
           newSteps[currentStepIndex].progress += Math.random() * 15 + 5
-
           if (newSteps[currentStepIndex].progress >= 100) {
             newSteps[currentStepIndex].progress = 100
             newSteps[currentStepIndex].status = "complete"
-            currentStepIndex++
+            setCurrentStepIndex((idx) => idx + 1)
           }
         }
-
         return newSteps
       })
-
       // Update overall progress
-      const completedSteps = steps.filter((step) => step.status === "complete").length
-      const currentStepProgress = steps[currentStepIndex]?.progress || 0
-      const newOverallProgress = (completedSteps * 100 + currentStepProgress) / steps.length
+      setSteps((stepsForProgress) => {
+        const completedSteps = stepsForProgress.filter((step) => step.status === "complete").length
+        const currentStepProgress = stepsForProgress[currentStepIndex]?.progress || 0
+        const newOverallProgress = (completedSteps * 100 + currentStepProgress) / stepsForProgress.length
       setOverallProgress(Math.min(newOverallProgress, 100))
+        return stepsForProgress
+      })
     }, 300)
-
     return () => clearInterval(interval)
-  }, [isScanning, onComplete])
+  }, [isScanning, onComplete, currentStepIndex])
 
   if (!isScanning) return null
 
