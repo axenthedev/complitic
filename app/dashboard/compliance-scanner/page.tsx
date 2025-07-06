@@ -8,12 +8,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
-import { Search, Shield, AlertTriangle, CheckCircle, XCircle, Globe, Clock, TrendingUp, ArrowRight, Loader2 } from "lucide-react"
+import { Search, Shield, AlertTriangle, CheckCircle, XCircle, Globe, Clock, TrendingUp, ArrowRight, Loader2, AlertCircle, Info } from "lucide-react"
 import { ScanProgress } from "@/components/dashboard/scan-progress"
 
 export default function ComplianceScannerPage() {
   const { user } = useUser();
-  const [storeUrl, setStoreUrl] = useState("")
+  const [websiteUrl, setWebsiteUrl] = useState("")
   const [isScanning, setIsScanning] = useState(false)
   const [scanResult, setScanResult] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
@@ -21,26 +21,68 @@ export default function ComplianceScannerPage() {
   const [waitingForResults, setWaitingForResults] = useState(false)
 
   const handleScan = async () => {
-    if (!storeUrl.trim() || !user?.id) return
+    if (!websiteUrl.trim() || !user?.id) return
+
+    // Clear previous results and errors
     setIsScanning(true)
     setScanResult(null)
     setError(null)
     setShowResults(false)
     setWaitingForResults(false)
+    
     try {
       const res = await fetch("/api/compliance-scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: user.id, url: storeUrl }),
+        body: JSON.stringify({ user_id: user.id, url: websiteUrl }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Scan failed")
+      
+      if (!res.ok) {
+        throw new Error(data.error || "Scan failed")
+      }
+      
       setScanResult(data)
     } catch (err: any) {
-      setError(err.message || "Scan failed")
+      setError(err.message || "An unexpected error occurred")
     } finally {
-      setIsScanning(false)
+    setIsScanning(false)
     }
+  }
+
+  const getErrorIcon = (errorMessage: string) => {
+    if (errorMessage.includes("timeout") || errorMessage.includes("too long")) {
+      return <Clock className="h-4 w-4" />
+    }
+    if (errorMessage.includes("not found") || errorMessage.includes("accessible")) {
+      return <Globe className="h-4 w-4" />
+    }
+    if (errorMessage.includes("blocking") || errorMessage.includes("denied")) {
+      return <Shield className="h-4 w-4" />
+    }
+    if (errorMessage.includes("valid URL") || errorMessage.includes("protocol")) {
+      return <AlertCircle className="h-4 w-4" />
+    }
+    return <AlertTriangle className="h-4 w-4" />
+  }
+
+  const getErrorSuggestions = (errorMessage: string) => {
+    if (errorMessage.includes("timeout")) {
+      return "Try scanning during off-peak hours or check if the website is experiencing high traffic."
+    }
+    if (errorMessage.includes("not found") || errorMessage.includes("accessible")) {
+      return "Double-check the URL spelling, ensure the website is online, and try removing any trailing slashes."
+    }
+    if (errorMessage.includes("blocking") || errorMessage.includes("denied")) {
+      return "Some websites block automated scanning. Try a different website or contact the website owner."
+    }
+    if (errorMessage.includes("valid URL")) {
+      return "Make sure to include 'https://' or 'http://' at the beginning of the URL."
+    }
+    if (errorMessage.includes("technical difficulties")) {
+      return "The website may be temporarily down. Please try again in a few minutes."
+    }
+    return "Please check the URL and try again. If the problem persists, try a different website."
   }
 
   // Show spinner for at least 10s after progress completes
@@ -58,8 +100,8 @@ export default function ComplianceScannerPage() {
     <div className="space-y-6">
       {/* Page Header */}
       <div className="bg-gradient-to-r from-[#1E293B] to-slate-700 rounded-xl p-6 text-white">
-        <h1 className="text-2xl font-bold mb-2">Store Compliance Scanner</h1>
-        <p className="text-slate-200">Analyze your store's compliance with GDPR, CCPA, and other privacy regulations</p>
+        <h1 className="text-2xl font-bold mb-2">Website Compliance Scanner</h1>
+        <p className="text-slate-200">Analyze any website's compliance with GDPR, CCPA, and other privacy regulations</p>
       </div>
 
       {/* Scan Input */}
@@ -68,34 +110,64 @@ export default function ComplianceScannerPage() {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Search className="h-5 w-5 text-blue-600" />
-              <span>Scan Your Store</span>
+              <span>Scan Any Website</span>
             </CardTitle>
-            <CardDescription>Enter your store URL to begin compliance analysis</CardDescription>
+            <CardDescription>Enter any website URL to begin compliance analysis</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="store-url">Store URL</Label>
+              <Label htmlFor="website-url">Website URL</Label>
               <div className="flex space-x-2">
                 <Input
-                  id="store-url"
+                  id="website-url"
                   type="url"
-                  placeholder="https://your-store.com"
-                  value={storeUrl}
-                  onChange={(e) => setStoreUrl(e.target.value)}
+                  placeholder="https://example.com"
+                  value={websiteUrl}
+                  onChange={(e) => {
+                    setWebsiteUrl(e.target.value)
+                    // Clear error when user starts typing
+                    if (error) setError(null)
+                  }}
                   disabled={isScanning}
                   className="flex-1"
                 />
                 <Button
                   onClick={handleScan}
-                  disabled={!storeUrl.trim() || isScanning}
+                  disabled={!websiteUrl.trim() || isScanning}
                   className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600"
                 >
                   <Search className="h-4 w-4 mr-2" />
-                  {isScanning ? "Scanning..." : "Scan Store"}
+                  {isScanning ? "Scanning..." : "Scan Website"}
                 </Button>
               </div>
             </div>
-            {error && <div className="text-red-600 text-sm mt-2">{error}</div>}
+            
+            {/* Error Display */}
+            {error && (
+              <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-start space-x-3">
+                  <div className="flex-shrink-0 mt-0.5">
+                    {getErrorIcon(error)}
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-medium text-red-800 mb-1">Scan Failed</h4>
+                    <p className="text-sm text-red-700 mb-2">{error}</p>
+                    <div className="flex items-start space-x-2">
+                      <Info className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                      <p className="text-xs text-red-600">{getErrorSuggestions(error)}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* URL Format Help */}
+            {!error && !isScanning && (
+              <div className="text-xs text-slate-500 flex items-center space-x-1">
+                <Info className="h-3 w-3" />
+                <span>Make sure to include the full URL with https:// or http://</span>
+              </div>
+            )}
           </CardContent>
         </div>
       </Card>
@@ -118,7 +190,7 @@ export default function ComplianceScannerPage() {
             <CardContent className="flex flex-col items-center justify-center p-8">
               <Loader2 className="h-10 w-10 text-blue-600 animate-spin mb-4" />
               <div className="text-lg font-semibold text-slate-700">Results coming...</div>
-              <div className="text-sm text-slate-500 mt-2">Analyzing your store. This may take a few seconds.</div>
+              <div className="text-sm text-slate-500 mt-2">Analyzing your website. This may take a few seconds.</div>
             </CardContent>
           </div>
         </Card>

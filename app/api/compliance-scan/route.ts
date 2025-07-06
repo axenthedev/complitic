@@ -16,26 +16,110 @@ function extractTrackers(html: string) {
   return trackers;
 }
 
+function validateUrl(url: string): { isValid: boolean; error?: string } {
+  try {
+    const urlObj = new URL(url);
+    if (!urlObj.protocol || !urlObj.hostname) {
+      return { isValid: false, error: "Please enter a valid URL with protocol (e.g., https://example.com)" };
+    }
+    if (!['http:', 'https:'].includes(urlObj.protocol)) {
+      return { isValid: false, error: "Only HTTP and HTTPS protocols are supported" };
+    }
+    return { isValid: true };
+  } catch {
+    return { isValid: false, error: "Please enter a valid URL (e.g., https://example.com)" };
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { user_id, store_id, url } = await req.json();
-    if (!user_id || !url) {
-      return NextResponse.json({ error: "Missing user_id or url" }, { status: 400 });
+    
+    // Validate required fields
+    if (!user_id) {
+      return NextResponse.json({ error: "User authentication required" }, { status: 401 });
     }
+    if (!url) {
+      return NextResponse.json({ error: "Please enter a website URL to scan" }, { status: 400 });
+    }
+
+    // Validate URL format
+    const urlValidation = validateUrl(url);
+    if (!urlValidation.isValid) {
+      return NextResponse.json({ error: urlValidation.error }, { status: 400 });
+    }
+
     // Fetch HTML
     let html;
     try {
-      const response = await axios.get(url, { timeout: 30000 });
+      const response = await axios.get(url, { 
+        timeout: 30000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+      });
       html = response.data;
     } catch (err: any) {
+      // Handle different types of network errors
       if (err.code === 'ECONNABORTED') {
-        return NextResponse.json({ error: "The website took too long to respond. Please try again later or check the site URL." }, { status: 504 });
+        return NextResponse.json({ 
+          error: "The website took too long to respond (timeout after 30 seconds). Please try again later or check if the website is accessible." 
+        }, { status: 504 });
       }
+      
       if (err.code === 'ENOTFOUND' || err.code === 'EAI_AGAIN' || /getaddrinfo/.test(err.message)) {
-        return NextResponse.json({ error: "The provided link could not be reached or is not a valid store URL. Please check the URL and try again." }, { status: 400 });
+        return NextResponse.json({ 
+          error: "Website not found. Please check the URL and make sure the website is accessible." 
+        }, { status: 404 });
       }
-      return NextResponse.json({ error: err.message || "Failed to fetch site HTML" }, { status: 500 });
+      
+      if (err.code === 'ECONNREFUSED') {
+        return NextResponse.json({ 
+          error: "Connection refused. The website may be down or blocking our requests." 
+        }, { status: 503 });
+      }
+      
+      if (err.response) {
+        // HTTP error responses
+        const status = err.response.status;
+        if (status === 403) {
+          return NextResponse.json({ 
+            error: "Access denied. This website is blocking automated access. Please try scanning a different website." 
+          }, { status: 403 });
+        }
+        if (status === 404) {
+          return NextResponse.json({ 
+            error: "Page not found. Please check the URL and make sure the page exists." 
+          }, { status: 404 });
+        }
+        if (status >= 500) {
+          return NextResponse.json({ 
+            error: "The website is experiencing technical difficulties. Please try again later." 
+          }, { status: 502 });
+        }
+        return NextResponse.json({ 
+          error: `Website returned an error (${status}). Please try again later.` 
+        }, { status: 502 });
+      }
+      
+      return NextResponse.json({ 
+        error: "Unable to access the website. Please check the URL and try again." 
+      }, { status: 500 });
     }
+
+    // Validate that we got HTML content
+    if (!html || typeof html !== 'string') {
+      return NextResponse.json({ 
+        error: "The website returned invalid content. Please try a different website." 
+      }, { status: 400 });
+    }
+
+    if (html.length < 100) {
+      return NextResponse.json({ 
+        error: "The website returned very little content. This might not be a valid webpage." 
+      }, { status: 400 });
+    }
+
     const $ = cheerio.load(html);
 
     // Check for privacy policy and terms links
@@ -62,7 +146,7 @@ export async function POST(req: NextRequest) {
     const contact_info = { emails, tels };
 
     // Save to Supabase
-    const { error } = await supabase.from("compliance_scans").insert([
+    const { error: dbError } = await supabase.from("compliance_scans").insert([
       {
         user_id,
         store_id,
@@ -79,9 +163,14 @@ export async function POST(req: NextRequest) {
         status: "completed",
       },
     ]);
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    
+    if (dbError) {
+      console.error("Database error:", dbError);
+      return NextResponse.json({ 
+        error: "Failed to save scan results. Please try again." 
+      }, { status: 500 });
     }
+    
     return NextResponse.json({
       privacy_policy_found,
       terms_found,
@@ -95,6 +184,9 @@ export async function POST(req: NextRequest) {
       status: "completed",
     });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Unknown error" }, { status: 500 });
+    console.error("Unexpected error:", err);
+    return NextResponse.json({ 
+      error: "An unexpected error occurred. Please try again later." 
+    }, { status: 500 });
   }
 } 
