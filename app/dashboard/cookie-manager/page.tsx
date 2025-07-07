@@ -142,6 +142,11 @@ export default function CookieManager() {
   }
 
   async function handleModalSave() {
+    if (!clerkUser?.id) {
+      toast({ title: "Error", description: "User not authenticated", variant: "destructive" });
+      return;
+    }
+    
     setSaving(true);
     try {
       if (modalMode === "add") {

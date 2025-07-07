@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -9,37 +10,81 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Bell, Search, Settings, User, LogOut, HelpCircle } from "lucide-react"
+import { Bell, HelpCircle, Store, CheckCircle } from "lucide-react"
+import Link from "next/link"
+import { UserButton } from "@clerk/nextjs"
 
 interface DashboardTopbarProps {
-  pageTitle: string
+  // pageTitle prop removed
 }
 
-export function DashboardTopbar({ pageTitle }: DashboardTopbarProps) {
+interface StoreConnection {
+  id: string
+  store_name: string
+  store_url: string
+  store_type: string
+  status: string
+}
+
+export function DashboardTopbar({}: DashboardTopbarProps) {
+  const [storeConnections, setStoreConnections] = useState<StoreConnection[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchStoreConnections()
+  }, [])
+
+  const fetchStoreConnections = async () => {
+    try {
+      const response = await fetch('/api/store-connections')
+      if (response.ok) {
+        const data = await response.json()
+        setStoreConnections(data.connections || [])
+      }
+    } catch (error) {
+      console.error('Error fetching store connections:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const hasConnectedStores = storeConnections.length > 0 && storeConnections.some(conn => conn.status === 'connected')
+
   return (
     <header className="sticky top-0 z-30 bg-white border-b border-slate-200 px-4 md:px-6 py-4">
       <div className="flex items-center justify-between">
-        {/* Left Section - Page Title & Search */}
+        {/* Left Section - Empty */}
         <div className="flex items-center space-x-4">
           <div className="ml-12 md:ml-0">
-            <h1 className="text-2xl font-bold text-slate-800">{pageTitle}</h1>
-          </div>
-
-          {/* Search Bar - Hidden on mobile */}
-          <div className="hidden lg:flex relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input placeholder="Search..." className="pl-10 w-64 bg-slate-50 border-slate-200 focus:bg-white" />
+            {/* Page title removed */}
           </div>
         </div>
 
         {/* Right Section - Actions & User */}
         <div className="flex items-center space-x-3">
-          {/* Search Button - Mobile Only */}
-          <Button variant="ghost" size="icon" className="lg:hidden">
-            <Search className="h-5 w-5" />
+          {/* Connect Store Button */}
+          <Button
+            variant={hasConnectedStores ? "outline" : "default"}
+            size="sm"
+            disabled={hasConnectedStores || loading}
+            asChild={!hasConnectedStores}
+            className={hasConnectedStores 
+              ? "bg-green-50 border-green-200 text-green-700 hover:bg-green-50" 
+              : "bg-green-600 hover:bg-green-700 text-white"
+            }
+          >
+            {hasConnectedStores ? (
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4" />
+                Store Connected
+              </div>
+            ) : (
+              <Link href="/dashboard/stores" className="flex items-center gap-2">
+                <Store className="h-4 w-4" />
+                Connect Store
+              </Link>
+            )}
           </Button>
 
           {/* Notifications */}
@@ -78,43 +123,18 @@ export function DashboardTopbar({ pageTitle }: DashboardTopbarProps) {
             <HelpCircle className="h-5 w-5" />
           </Button>
 
-          {/* User Profile */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                <Avatar className="h-10 w-10">
-                  <AvatarImage src="/placeholder.svg?height=40&width=40" alt="User" />
-                  <AvatarFallback className="bg-slate-100">JD</AvatarFallback>
-                </Avatar>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium">John Doe</p>
-                  <p className="text-xs text-slate-600">john@example.com</p>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <User className="mr-2 h-4 w-4" />
-                Profile
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Settings className="mr-2 h-4 w-4" />
-                Settings
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <HelpCircle className="mr-2 h-4 w-4" />
-                Help & Support
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-red-600">
-                <LogOut className="mr-2 h-4 w-4" />
-                Sign out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* User Profile - Clerk UserButton */}
+          <UserButton 
+            appearance={{
+              elements: {
+                avatarBox: "h-10 w-10",
+                userButtonPopoverCard: "shadow-lg border border-slate-200",
+                userButtonPopoverActionButton: "hover:bg-slate-50",
+                userButtonPopoverActionButtonText: "text-slate-700",
+                userButtonPopoverFooter: "border-t border-slate-200"
+              }
+            }}
+          />
         </div>
       </div>
     </header>

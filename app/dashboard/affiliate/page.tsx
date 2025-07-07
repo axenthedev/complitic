@@ -321,6 +321,21 @@ export default function AffiliateDashboard() {
           </Card>
         </div>
 
+        {/* Request Payout Button */}
+        <div className="mb-8 flex justify-end">
+          <Button
+            className="bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-2 rounded shadow"
+            onClick={() => setIsPayoutModalOpen(true)}
+          >
+            Request Payout
+          </Button>
+        </div>
+        <PayoutRequestModal
+          isOpen={isPayoutModalOpen}
+          onClose={() => setIsPayoutModalOpen(false)}
+          availableBalance={stats?.available_balance || 0}
+        />
+
         {/* Main Content */}
         <Tabs defaultValue="links" className="space-y-6">
           <TabsList className="bg-white border shadow-sm">

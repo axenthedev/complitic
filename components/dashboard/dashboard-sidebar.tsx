@@ -24,6 +24,8 @@ import {
   Calendar,
   Mail,
   MessageCircle,
+  Sparkles,
+  Library,
 } from "lucide-react"
 
 const navigationGroups = [
@@ -37,7 +39,8 @@ const navigationGroups = [
   {
     title: "Compliance Tools",
     items: [
-      { title: "Policy Generator", href: "/dashboard/policy-generator", icon: FileText },
+      { title: "AI Policy Maker", href: "/dashboard/policy-generator", icon: Sparkles },
+      { title: "Policy Library", href: "/dashboard/policy-library", icon: Library },
       { title: "Templates", href: "/dashboard/templates", icon: FileText },
       { title: "Cookie Manager", href: "/dashboard/cookie-manager", icon: Cookie },
       { title: "Compliance Scanner", href: "/dashboard/compliance-scanner", icon: Search },

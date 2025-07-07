@@ -1,10 +1,10 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, FileText, Shield, Truck, CreditCard, Cookie, Clock, Edit, Download } from "lucide-react";
+import { Search, FileText, Shield, Truck, CreditCard, Cookie } from "lucide-react";
 import Link from "next/link";
 import { getAllTemplates } from "@/lib/templates/policies";
 
@@ -21,21 +21,9 @@ const templateIcons = {
   shipping_policy: Truck,
 };
 
-interface CustomizedTemplate {
-  id: string;
-  template_slug: string;
-  template_name: string;
-  content: string;
-  form_data: any;
-  created_at: string;
-  updated_at: string;
-}
-
 export default function TemplatesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [customizedTemplates, setCustomizedTemplates] = useState<CustomizedTemplate[]>([]);
-  const [loading, setLoading] = useState(true);
   
   const templates = getAllTemplates();
   
@@ -45,46 +33,6 @@ export default function TemplatesPage() {
     const matchesCategory = selectedCategory === "all" || template.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
-
-  useEffect(() => {
-    fetchCustomizedTemplates();
-  }, []);
-
-  const fetchCustomizedTemplates = async () => {
-    try {
-      const response = await fetch('/api/templates/customized');
-      if (response.ok) {
-        const data = await response.json();
-        setCustomizedTemplates(data.customizedTemplates || []);
-      }
-    } catch (error) {
-      console.error('Error fetching customized templates:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const downloadCustomizedTemplate = (template: CustomizedTemplate) => {
-    const blob = new Blob([template.content], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${template.template_name.toLowerCase().replace(/\s+/g, "_")}_${template.form_data?.store_name || 'customized'}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
 
   return (
     <div className="max-w-6xl mx-auto p-6">
@@ -195,80 +143,6 @@ export default function TemplatesPage() {
           </p>
         </div>
       )}
-
-      {/* Recently Customized Templates Section */}
-      <div className="mt-12 mb-8">
-        <div className="flex items-center gap-2 mb-4">
-          <Clock className="w-5 h-5 text-blue-600" />
-          <h2 className="text-xl font-semibold">Recently Customized Templates</h2>
-        </div>
-        
-        {loading ? (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="text-gray-600 mt-2">Loading your customized templates...</p>
-          </div>
-        ) : customizedTemplates.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {customizedTemplates.map((template) => (
-              <Card key={template.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <Badge variant="outline" className="text-xs">
-                      {template.template_name}
-                    </Badge>
-                    <span className="text-xs text-gray-500">
-                      {formatDate(template.created_at)}
-                    </span>
-                  </div>
-                  <CardTitle className="text-sm">
-                    {template.form_data?.store_name || 'Customized Template'}
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    {template.form_data?.store_url || 'No URL provided'}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="flex-1"
-                      onClick={() => downloadCustomizedTemplate(template)}
-                    >
-                      <Download className="w-3 h-3 mr-1" />
-                      Download
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      asChild
-                    >
-                      <Link href={`/dashboard/templates/${template.template_slug}`}>
-                        <Edit className="w-3 h-3 mr-1" />
-                        Edit
-                      </Link>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8 bg-gray-50 rounded-lg">
-            <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No customized templates yet</h3>
-            <p className="text-gray-600 mb-4">
-              Create your first customized template by selecting a template above and filling out the form.
-            </p>
-            <Button asChild variant="outline">
-              <Link href="#templates">
-                Browse Templates
-              </Link>
-            </Button>
-          </div>
-        )}
-      </div>
 
       {/* Help Section */}
       <div className="mt-12 p-6 bg-gray-50 rounded-lg">

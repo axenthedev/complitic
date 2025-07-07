@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { useAuth, useUser } from "@clerk/nextjs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -124,6 +125,9 @@ function MessageBubble({ role, text, sources }: { role: string; text: string; so
 }
 
 export default function AdvisorPage() {
+  const { getToken, isLoaded } = useAuth();
+  const { user: clerkUser, isLoaded: isClerkLoaded } = useUser();
+  
   const [messages, setMessages] = useState<any[]>([{
     role: "assistant",
     text: "Hi! I'm your AI Compliance Assistant. Ask me any legal or compliance question about your store, privacy, cookies, or regulations. You can also attach images or links for context.",
@@ -142,8 +146,17 @@ export default function AdvisorPage() {
   useEffect(() => {
     async function fetchContextAndHistory() {
       try {
+        // Get Clerk session token for API calls
+        const token = await getToken({ template: "supabase" });
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
+
         // Fetch context
-        const res = await fetch("/api/advisor/context");
+        const res = await fetch("/api/advisor/context", { headers });
         if (!res.ok) {
           const errorText = await res.text();
           console.error('Failed to fetch context:', res.status, res.statusText, errorText);
@@ -155,7 +168,7 @@ export default function AdvisorPage() {
         }
 
         // Fetch chat history
-        const chatRes = await fetch("/api/advisor/chat");
+        const chatRes = await fetch("/api/advisor/chat", { headers });
         if (!chatRes.ok) {
           const errorText = await chatRes.text();
           console.error('Failed to fetch chat history:', chatRes.status, chatRes.statusText, errorText);
@@ -186,8 +199,11 @@ export default function AdvisorPage() {
         }]);
       }
     }
-    fetchContextAndHistory();
-  }, []);
+    
+    if (isLoaded && isClerkLoaded && clerkUser?.id) {
+      fetchContextAndHistory();
+    }
+  }, [getToken, isLoaded, isClerkLoaded, clerkUser?.id]);
 
   // Cleanup recording timer on unmount
   useEffect(() => {
@@ -214,11 +230,20 @@ export default function AdvisorPage() {
     setLoading(true);
     
     try {
+      // Get Clerk session token for API calls
+      const token = await getToken({ template: "supabase" });
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
       // Save user message (optional - continue even if it fails)
       try {
         const saveUserRes = await fetch("/api/advisor/chat", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify({ role: "user", message: msgText, image_url: image }),
         });
         
@@ -234,7 +259,7 @@ export default function AdvisorPage() {
       // Call backend API for Gemini answer
       const res = await fetch("/api/advisor/ask", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           question: msgText,
           history: messages,
@@ -260,7 +285,7 @@ export default function AdvisorPage() {
       try {
         const saveAssistantRes = await fetch("/api/advisor/chat", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify({ role: "assistant", message: data.text }),
         });
         
@@ -306,7 +331,19 @@ export default function AdvisorPage() {
   async function clearChat() {
     if (confirm("Are you sure you want to clear the chat history?")) {
       try {
-        const res = await fetch("/api/advisor/chat", { method: "DELETE" });
+        // Get Clerk session token for API calls
+        const token = await getToken({ template: "supabase" });
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
+
+        const res = await fetch("/api/advisor/chat", { 
+          method: "DELETE",
+          headers
+        });
         if (!res.ok) {
           throw new Error(`Failed to clear chat: ${res.status}`);
         }
